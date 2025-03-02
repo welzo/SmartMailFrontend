@@ -1,4 +1,5 @@
 import streamlit as st
+import urllib.parse
 
 def show():
     if "selected_sender" not in st.session_state:
@@ -8,72 +9,82 @@ def show():
     sender = st.session_state["selected_sender"]
     st.title(f"Emails from {sender['name']} ({sender['email']})")
 
-    # ✅ 检查 `st.session_state` 里是否已经存了邮件数据
-    if "email_data" not in st.session_state:
-        # ✅ 只在第一次进入页面时生成数据，并存入 `session_state`
-        email_data = [
-            {"id": "1", "subject": "Monthly Ride Summary", "priority": "High"},
-            {"id": "2", "subject": "Exclusive Offer for You!", "priority": "Medium"},
-            {"id": "3", "subject": "Your Weekly Newsletter", "priority": "Low"},
-            {"id": "4", "subject": "Important Account Update", "priority": "High"},
-            {"id": "5", "subject": "Limited Time Deal!", "priority": "Medium"},
-        ]
-        st.session_state["email_data"] = email_data
+    # Use fetched emails if available, otherwise fallback to static sample data
+    if "selected_sender_details" in st.session_state:
+        # Expecting the fetched details to be a list of emails with keys: email_id, subject, and priority
+        email_data = st.session_state["selected_sender_details"]
     else:
-        # ✅ 直接从 `session_state` 读取邮件数据，避免优先级变化
-        email_data = st.session_state["email_data"]
+        st.warning("No email details available. Showing sample data.")
+        email_data = [
+            {"email_id": "1", "subject": "Monthly Ride Summary", "priority": "High"},
+            {"email_id": "2", "subject": "Exclusive Offer for You!", "priority": "Medium"},
+            {"email_id": "3", "subject": "Your Weekly Newsletter", "priority": "Low"},
+            {"email_id": "4", "subject": "Important Account Update", "priority": "High"},
+            {"email_id": "5", "subject": "Limited Time Deal!", "priority": "Medium"},
+        ]
 
-    # ✅ 按照 `Priority` 从高到低排序
-    priority_order = {"High": 1, "Medium": 2, "Low": 3}
-    email_data.sort(key=lambda x: priority_order[x["priority"]])
+    # If your backend already prioritized the emails, you might not need to re-sort them.
+    # But if you want to enforce an order (say, highest priority first), you can do so:
+    # For example, if priority is numeric (e.g., 1-10), you might want to sort like:
+    email_data.sort(key=lambda x: x["priority"], reverse=False)  # Adjust based on your logic
 
     if not email_data:
         st.warning("No emails found.")
         st.stop()
 
-    # ✅ 选中的邮件
+    # Layout the email details with a table-like view
     col1, col2, col3 = st.columns([1, 5, 2])
     with col1:
         select_all_emails = st.checkbox("Select All")
     with col2:
         st.write("Email Subject")
     with col3:
-        st.write("Priority")
+        st.write("Spam Level")
 
     selected_emails = []
     for email in email_data:
         with col1:
-            checked = st.checkbox("", key=email["id"], value=select_all_emails)
+            # Use a unique key for each checkbox, based on the email_id
+            checked = st.checkbox("", key=email["email_id"], value=select_all_emails)
             if checked:
-                selected_emails.append(email["id"])
+                selected_emails.append(email["email_id"])
         with col2:
             st.write(email["subject"])
         with col3:
-            # ✅ 让 Priority 有不同颜色
-            priority_color = {
-                "High": "🔴 High",
-                "Medium": "🟡 Medium",
-                "Low": "🟢 Low"
-            }
-            st.write(priority_color[email["priority"]])
+            priority_value = email["priority"]
+            if isinstance(priority_value, int):
+                if priority_value >= 8:
+                    priority_text = f"🔴"
+                elif priority_value <= 5:
+                    priority_text = f"🟢"
+                else:
+                    priority_text = f"🟡"
+            else:
+                # Fallback if 'priority' isn't an integer
+                priority_text = str(priority_value)
 
-    # ✅ 操作按钮
+            st.write(priority_text)
+
+    # Operations on selected emails
     col1, col2 = st.columns(2)
     with col1:
         if st.button("Delete Selected Emails"):
             if selected_emails:
-                # ✅ 删除邮件时，同时更新 `session_state`
-                st.session_state["email_data"] = [email for email in email_data if email["id"] not in selected_emails]
+                # Remove emails whose email_id is in selected_emails.
+                st.session_state["selected_sender_details"] = [
+                    email for email in email_data if email["email_id"] not in selected_emails
+                ]
                 st.success(f"Deleted {len(selected_emails)} emails from {sender['name']}")
                 st.rerun()
 
     with col2:
         if st.button("Mark Selected Emails as Read"):
             if selected_emails:
+                # You can trigger your backend mark-as-read action here.
                 st.success(f"Marked {len(selected_emails)} emails as read from {sender['name']}")
                 st.rerun()
 
-    # ✅ 返回按钮
+    # Back button to go to top senders page
     if st.button("Back to Top Senders"):
         st.session_state["page"] = "top_senders"
         st.rerun()

@@ -33,6 +33,22 @@ def show():
                     selected_senders.append(sender["email"])
             with col2:
                 if st.button(sender["name"], key=f"btn_{sender['email']}"):
+                    # URL encode the sender's email
+                    encoded_email = urllib.parse.quote_plus(sender["email"])
+                    # Construct the URL for your backend details endpoint.
+                    # For example, you might create an endpoint /get_sender_details on your Flask backend.
+                    details_url = f"http://localhost:8080/prioritize_emails?sender={encoded_email}&date={start_date}"
+                    headers = {"Authorization": f"Bearer {st.session_state['access_token']}"}
+                    try:
+                        response = requests.get(details_url, headers=headers)
+                        if response.status_code == 200:
+                            # Store the returned details in session state.
+                            st.session_state["selected_sender_details"] = response.json()
+                        else:
+                            st.error(f"Error fetching details: HTTP {response.status_code}")
+                    except Exception as e:
+                        st.error(f"Request failed: {e}")
+                    # Set page state to "details" and re-run
                     st.session_state["selected_sender"] = sender
                     st.session_state["page"] = "details"
                     st.rerun()
