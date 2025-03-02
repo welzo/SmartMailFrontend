@@ -1,5 +1,6 @@
-# top_senders.py
 import streamlit as st
+import urllib.parse
+import requests
 
 def show():
     st.title("Top Senders")
@@ -11,21 +12,23 @@ def show():
     if senders_data:
         st.success(f"Showing top {top_n} senders since {start_date}")
 
-        col1, col2, col3, col4 = st.columns([1, 3, 5, 2])
-        with col1:
-            select_all = st.checkbox("All", key="select_all")
-        with col2:
-            st.write("Sender Name")
-        with col3:
-            st.write("Email Address")
-        with col4:
-            st.write("Unread Emails")
+        # HEADER ROW: Display column headers.
+        colH1, colH2, colH3, colH4 = st.columns([1, 3, 5, 2])
+        with colH1:
+            st.markdown("<p style='text-align:center; font-weight:bold;'>All</p>", unsafe_allow_html=True)
+            select_all = st.checkbox("", key="select_all", label_visibility="hidden")
+        with colH2:
+            st.markdown("<p style='font-weight:bold;'>Sender Name</p>", unsafe_allow_html=True)
+        with colH3:
+            st.markdown("<p style='font-weight:bold;'>Email Address</p>", unsafe_allow_html=True)
+        with colH4:
+            st.markdown("<p style='font-weight:bold;'>Unread Emails</p>", unsafe_allow_html=True)
 
         selected_senders = []
         for sender in senders_data:
             col1, col2, col3, col4 = st.columns([1, 3, 5, 2])
             with col1:
-                checked = st.checkbox("", key=f"check_{sender['email']}", value=select_all)
+                checked = st.checkbox("", key=f"check_{sender['email']}", value=select_all, label_visibility="hidden")
                 if checked:
                     selected_senders.append(sender["email"])
             with col2:
@@ -38,17 +41,53 @@ def show():
             with col4:
                 st.write(sender["unread_count"])
 
-        col1, col2 = st.columns(2)
-        with col1:
+        colB1, colB2 = st.columns(2)
+        with colB1:
             if st.button("❌ Delete Selected Senders' Emails"):
                 if selected_senders:
-                    st.success(f"Deleted all emails from: {', '.join(selected_senders)}")
+                    success_count = 0
+                    for email in selected_senders:
+                        # URL encode the email
+                        encoded_email = urllib.parse.quote_plus(email)
+                        trash_url = f"http://localhost:8080/trash_emails?sender={encoded_email}"
+                        headers = {"Authorization": f"Bearer {st.session_state['access_token']}"}
+                        r = requests.get(trash_url, headers=headers)
+                        if r.status_code == 200:
+                            success_count += 1
+                        else:
+                            st.error(f"Failed to delete emails for {email}: HTTP {r.status_code}")
+                    if success_count:
+                        st.success(f"Deleted emails for {success_count} sender(s): {', '.join(selected_senders)}")
+                        # Remove the deleted senders from session data.
+                        st.session_state["senders_data"] = [
+                            sender for sender in st.session_state["senders_data"]
+                            if sender["email"] not in selected_senders
+                        ]
+                        st.rerun()
                 else:
                     st.warning("Please select at least one sender.")
-        with col2:
+        with colB2:
             if st.button("✅ Mark All as Read"):
                 if selected_senders:
-                    st.success(f"Marked all emails as read from: {', '.join(selected_senders)}")
+                    success_count = 0
+                    for email in selected_senders:
+                        encoded_email = urllib.parse.quote_plus(email)
+                        mark_url = f"http://localhost:8080/mark_as_read?sender={encoded_email}"
+                        headers = {"Authorization": f"Bearer {st.session_state['access_token']}"}
+                        r = requests.get(mark_url, headers=headers)
+                        if r.status_code == 200:
+                            success_count += 1
+                        else:
+                            st.error(f"Failed to mark emails as read for {email}: HTTP {r.status_code}")
+                    if success_count:
+                        st.success(f"Marked emails as read for {success_count} sender(s): {', '.join(selected_senders)}")
+                        st.session_state["senders_data"] = [
+                            sender for sender in st.session_state["senders_data"]
+                            if sender["email"] not in selected_senders
+                        ]
+                        # Optionally, update your senders_data or refresh the data from backend.
+                        # st.session_state["senders_data"] = <fetch updated data from /top_senders endpoint>
+                        st.rerun()
                 else:
                     st.warning("Please select at least one sender.")
     else:

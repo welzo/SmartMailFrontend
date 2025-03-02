@@ -2,6 +2,8 @@
 import streamlit as st
 import datetime
 import requests
+import warnings
+warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 def show():
     st.title("Smart News Cleaner")
