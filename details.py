@@ -35,7 +35,7 @@ def show():
         with col2:
             st.write("Email Subject")
         with col3:
-            st.write("Spam Level")
+            st.write("Priority")
 
         selected_emails = []
         for email in email_data:
@@ -90,8 +90,31 @@ def show():
         with col2:
             if st.button("Mark Selected Emails as Read"):
                 if selected_emails:
-                    st.success(f"Marked {len(selected_emails)} emails as read from {sender['name']}")
+                    headers = {"Authorization": f"Bearer {st.session_state['access_token']}"}
+                    errors = []
+                    for email_id in selected_emails:
+                        encoded_email_id = urllib.parse.quote_plus(email_id)
+                        # Construct the URL for marking the email as read by its ID.
+                        url = f"http://localhost:8080/mark_email_as_read_by_id?email_id={encoded_email_id}"
+                        try:
+                            response = requests.get(url, headers=headers)
+                            if response.status_code == 200:
+                                st.write(f"Email {email_id} marked as read successfully.")
+                                st.session_state.pop("senders_data", None)
+                            else:
+                                error_detail = response.json().get("details", "Unknown error")
+                                errors.append(f"Error marking {email_id}: {error_detail}")
+                        except Exception as e:
+                            errors.append(f"Error marking {email_id}: {e}")
+                    if errors:
+                        st.error("\n".join(errors))
+                    else:
+                        st.success(f"Marked {len(selected_emails)} emails as read from {sender['name']}")
+                    st.session_state["selected_sender_details"] = [
+                        email for email in email_data if email["email_id"] not in selected_emails
+                    ]
                     st.rerun()
+
     else:
         st.warning("No emails found.")
 
